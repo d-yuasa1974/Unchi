@@ -1,15 +1,7 @@
-﻿<!-- おつうじドカン！ – ローカルランキング実装版 (HTML + JavaScript)
-     機能追加:
-       • お通じ番付（高得点TOP10）
-       • 便秘番付   （低得点TOP10）
-       • HOW TO PLAY の右に「ランキング」ボタン
-       • GAME OVER で番付入りなら名前入力（全角6文字以内）→保存
-       • localStorage に保存（キー: oz_hi, oz_lo）
--->
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8" />
+<meta charset="UTF-8">  
 <title>おつうじドカン！</title>
 <style>
 :root{--bg:#111;--panel:#222;--score-color:#ffe761;--grad1:#ff99cc;--grad2:#ff6699}
@@ -38,7 +30,7 @@ html,body{height:100%;margin:0;background:var(--bg);font-family:'Rounded Mplus 1
 <body>
 <div id="wrapper">
   <svg id="titleSVG" viewBox="0 0 360 90" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="grad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ff99cc"/><stop offset="100%" stop-color="#ff6699"/></linearGradient></defs><text x="50%" y="60%" dominant-baseline="middle" text-anchor="middle" font-size="44" font-weight="900" fill="url(#grad)" stroke="#fff" stroke-width="3" paint-order="stroke">おつうじドカン！</text></svg>
-  <div style="display:flex;gap:8px">
+  <div style="display:flex;gap:8px;">
     <button id="howBtn"   class="btn how-btn">HOW TO PLAY</button>
     <button id="rankBtn"  class="btn rank-btn">ランキング</button>
   </div>
@@ -47,23 +39,17 @@ html,body{height:100%;margin:0;background:var(--bg);font-family:'Rounded Mplus 1
   <div id="info">Enter:開始 / ←→:横移動 / ↓:高速落下 / Space:回転</div>
 </div>
 
-<!-- HOW TO PLAY Modal -->
 <div id="howModal" class="modal hidden"><div class="modal-box"><h3>遊びかた</h3><p>「うんち」をつなげて<strong>ドカン！</strong>と出そう！</p><p>縦・横にそろうとお通じが発生するよ。</p><p>同じ4文字をそろえても消えるけど点数はつきません。</p><p>連鎖でお通じが発生すると得点アップ！</p><p>お下品な言葉がそろうと…お仕置きがあるかも？</p><button id="closeHow">とじる</button></div></div>
 
-<!-- RANK Modal -->
 <div id="rankModal" class="modal hidden"><div class="modal-box" id="rankBox"></div></div>
 
-<!-- Name Input Modal -->
-<div id="nameModal" class="modal hidden"><div class="modal-box"><h3>番付入り！名前を入れてね</h3><input id="nameInput" maxlength="6" placeholder="全角６文字まで"/><button id="saveName">保存</button></div></div>
+<div id="nameModal" class="modal hidden"><div class="modal-box"><h3>番付入り！名前を入れてね</h3><input id="nameInput" maxlength="6" placeholder="全角6文字まで"/><button id="saveName">保存</button></div></div>
 
-<script type="module">              <!-- ★ ES Modules 化 ★ -->
-
+<script type="module">
 /* ==== 1. Firebase SDK を読み込む（軽量なモジュール版） ==== */
-import { initializeApp } from
-  "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, query, orderBy, limit,
-         getDocs, addDoc, deleteDoc } from
-  "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, query, orderBy, limit, getDocs, addDoc, deleteDoc }
+   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 /* ==== 2. あなたの firebaseConfig を貼り付け ==== */
 const firebaseConfig = {
@@ -79,7 +65,7 @@ const firebaseConfig = {
 /* ==== 3. Firestore を初期化 ==== */
 const app = initializeApp(firebaseConfig);
 const db  = getFirestore(app);
-(()=>{
+
  /*================== 共通ヘルパ ==================*/
 /* モーダルが 1 枚でも開いているか判定 */
 function isModalOpen(){
@@ -238,7 +224,7 @@ async function lock() {
     render();
     return;
   }
-  chain(1, spawn);
+  await chain(1, spawn);
 }
 function seq(word) {
   const L = word.length, res = [];
@@ -460,8 +446,8 @@ rankModal.addEventListener('click', e => e.target === rankModal && rankModal.cla
 const nameModal = document.getElementById('nameModal'),
       nameInput = document.getElementById('nameInput'),
       saveName = document.getElementById('saveName');
-       /* ★ input 内で Enter → 名前保存（バブリングさせない） */
- nameInput.addEventListener('keydown', e=>{
+
+ \nnameInput.addEventListener('keydown', e=>{
    if (e.code === 'Enter'){
      saveName.click();          // 保存ボタンを仮想クリック
      e.preventDefault();        // フォーム送信などの既定動作を阻止
@@ -481,4 +467,4 @@ saveName.onclick = async () => {
   nameModal.classList.add('hidden');
   enterReleased = false;   // ← Enter リリース待ち
 };
-})();
+</script>
