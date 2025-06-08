@@ -8,8 +8,7 @@
 html,body{height:100%;margin:0;background:var(--bg);font-family:'Rounded Mplus 1c',sans-serif;color:#eee;display:flex;justify-content:center;align-items:flex-start;user-select:none}
 #wrapper {
   position: relative;      /* コントローラ配置の基準に */
-  width: 100%;             
-  max-width: 360px;        /* 元のキャンバス幅に合わせる */
+  width: 100%;
   margin-top: 8px;
 }
 #titleSVG{width:360px;height:90px}
@@ -20,6 +19,7 @@ html,body{height:100%;margin:0;background:var(--bg);font-family:'Rounded Mplus 1
 #score{font-size:1.6rem;font-weight:800;color:var(--score-color);text-shadow:0 0 6px var(--score-color)}
 #gameCanvas {
   width: 100%;
+  max-width: 100%;
   height: auto;            /* アスペクト比を保持 */
 }
 #info{margin-top:4px;font-size:.9rem;color:#ccc}
@@ -61,8 +61,8 @@ html,body{height:100%;margin:0;background:var(--bg);font-family:'Rounded Mplus 1
   /* ④ 十字キーを縦並び＆間隔調整 */
 #touchControls #dpad {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-direction: row;
+  gap: 12px;
   pointer-events: auto;
 }
 
