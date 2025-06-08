@@ -192,7 +192,7 @@ const rand = () => CHARS[Math.random() * 3 | 0],
       upd = () => scoreDIV.textContent = `SCORE: ${score}`,
       clear = () => grid.forEach(r => r.fill(null));
 
-function spawn() {
+async function spawn() {
   cur = new Piece(nextBig);
   nextBig = false;
   if (!cur.cells.every(c => free(c.x, c.y))) {
@@ -228,7 +228,7 @@ function rot() {
     b.x = np.x; b.y = np.y;
   }
 }
-function lock() {
+async function lock() {
   cur.cells.forEach(c => {
     if (!inB(c.x, c.y)) over = true;
     else grid[c.y][c.x] = { char: c.char };
