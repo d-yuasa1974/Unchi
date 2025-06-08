@@ -447,7 +447,7 @@ const nameModal = document.getElementById('nameModal'),
       nameInput = document.getElementById('nameInput'),
       saveName = document.getElementById('saveName');
 
- \nnameInput.addEventListener('keydown', e=>{
+ nameInput.addEventListener('keydown', e=>{
    if (e.code === 'Enter'){
      saveName.click();          // 保存ボタンを仮想クリック
      e.preventDefault();        // フォーム送信などの既定動作を阻止
