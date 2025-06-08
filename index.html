@@ -471,7 +471,9 @@ function draw(x, y, ch, c) {
   ctx.fillStyle = fill;
   ctx.fillRect(px + 2, py + 2, CELL - 4, CELL - 4);
   ctx.fillStyle = "#000";
-  ctx.font = "28px sans-serif";
+  / セルサイズの 90% をフォントサイズに
+  const fontSize = Math.floor(CELL * 0.9);
+  ctx.font = `${fontSize}px 'Rounded Mplus 1c', sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(ch, px + CELL / 2, py + CELL / 2 + 2);
