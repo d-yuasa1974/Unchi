@@ -1,0 +1,491 @@
+﻿<!-- おつうじドカン！ – ローカルランキング実装版 (HTML + JavaScript)
+     機能追加:
+       • お通じ番付（高得点TOP10）
+       • 便秘番付   （低得点TOP10）
+       • HOW TO PLAY の右に「ランキング」ボタン
+       • GAME OVER で番付入りなら名前入力（全角6文字以内）→保存
+       • localStorage に保存（キー: oz_hi, oz_lo）
+-->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<title>おつうじドカン！</title>
+<style>
+:root{--bg:#111;--panel:#222;--score-color:#ffe761;--grad1:#ff99cc;--grad2:#ff6699}
+html,body{height:100%;margin:0;background:var(--bg);font-family:'Rounded Mplus 1c',sans-serif;color:#eee;display:flex;justify-content:center;align-items:flex-start;user-select:none}
+#wrapper{display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:8px}
+#titleSVG{width:360px;height:90px}
+.btn{border:none;border-radius:20px;padding:6px 20px;font-size:1rem;font-weight:700;color:#fff;cursor:pointer;box-shadow:0 0 8px #000a;transition:transform .1s}
+.btn:active{transform:scale(.96)}
+.how-btn{background:linear-gradient(90deg,var(--grad1),var(--grad2))}
+.rank-btn{background:#66c;}
+#score{font-size:1.6rem;font-weight:800;color:var(--score-color);text-shadow:0 0 6px var(--score-color)}
+#gameCanvas{background:var(--panel);box-shadow:0 0 12px #000a;border-radius:4px}
+#info{margin-top:4px;font-size:.9rem;color:#ccc}
+.modal{position:fixed;inset:0;background:#000c;display:flex;justify-content:center;align-items:center;font-size:.9rem;z-index:1000}
+.hidden{display:none}
+.modal-box{background:#333;padding:20px 24px;border-radius:8px;max-width:300px;line-height:1.4;box-shadow:0 0 12px #000a;text-align:center}
+.modal-box h3{margin:0 0 8px;font-size:1.2rem;color:#ffd1e8}
+.modal-box button{margin-top:12px;width:100%;padding:6px 0;border:none;border-radius:18px;background:#555;color:#fff;font-weight:700;cursor:pointer}
+.modal-box input{width:100%;padding:6px;border-radius:6px;border:none;margin-top:8px;text-align:center;font-size:1rem}
+.rank-table{display:flex;gap:18px;justify-content:center}
+.rank-table ol{padding-left:20px;text-align:left;min-width:100px}
+.rank-table li{margin-bottom:2px}
+.rank-table span{float:right}
+</style>
+</head>
+<body>
+<div id="wrapper">
+  <svg id="titleSVG" viewBox="0 0 360 90" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="grad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ff99cc"/><stop offset="100%" stop-color="#ff6699"/></linearGradient></defs><text x="50%" y="60%" dominant-baseline="middle" text-anchor="middle" font-size="44" font-weight="900" fill="url(#grad)" stroke="#fff" stroke-width="3" paint-order="stroke">おつうじドカン！</text></svg>
+  <div style="display:flex;gap:8px">
+    <button id="howBtn"   class="btn how-btn">HOW TO PLAY</button>
+    <button id="rankBtn"  class="btn rank-btn">ランキング</button>
+  </div>
+  <div id="score">SCORE: 0</div>
+  <canvas id="gameCanvas" width="320" height="560"></canvas>
+  <div id="info">Enter:開始 / ←→:横移動 / ↓:高速落下 / Space:回転</div>
+</div>
+
+<!-- HOW TO PLAY Modal -->
+<div id="howModal" class="modal hidden"><div class="modal-box"><h3>遊びかた</h3><p>「うんち」をつなげて<strong>ドカン！</strong>と出そう！</p><p>縦・横にそろうとお通じが発生するよ。</p><p>同じ4文字をそろえても消えるけど点数はつきません。</p><p>連鎖でお通じが発生すると得点アップ！</p><p>お下品な言葉がそろうと…お仕置きがあるかも？</p><button id="closeHow">とじる</button></div></div>
+
+<!-- RANK Modal -->
+<div id="rankModal" class="modal hidden"><div class="modal-box" id="rankBox"></div></div>
+
+<!-- Name Input Modal -->
+<div id="nameModal" class="modal hidden"><div class="modal-box"><h3>番付入り！名前を入れてね</h3><input id="nameInput" maxlength="6" placeholder="全角６文字まで"/><button id="saveName">保存</button></div></div>
+
+<script>
+(()=>{
+ /*================== 共通ヘルパ ==================*/
+/* モーダルが 1 枚でも開いているか判定 */
+function isModalOpen(){
+  return [...document.querySelectorAll('.modal')]
+           .some(m => !m.classList.contains('hidden'));
+}
+/*-------- ランキング処理 --------*/
+const HI_KEY = 'oz_hi', LO_KEY = 'oz_lo';   // コレクション名はそのまま
+
+/*--- Firestore 版：非同期（async/await） ---*/
+async function loadRank(kind){
+  const q = query(collection(db, kind),
+                  orderBy("score",
+                          kind === HI_KEY ? "desc" : "asc"),
+                  limit(10));
+  const snap = await getDocs(q);
+  return snap.docs.map(d => d.data());     // [{name,score},…]
+}
+
+async function saveRank(kind, arr){
+  const col = collection(db, kind);
+  const cur = await getDocs(col);          // 既存を全削除
+  await Promise.all(cur.docs.map(d => deleteDoc(d.ref)));
+  await Promise.all(arr.map(o => addDoc(col, o))); // 再登録
+}
+
+async function tryRegister(score){
+  const hi = await loadRank(HI_KEY);
+  const lo = await loadRank(LO_KEY);
+  let placed = false;
+
+  if (hi.length < 10 || score > hi.at(-1).score){
+    hi.push({score, name:''});
+    hi.sort((a,b)=>b.score-a.score);
+    await saveRank(HI_KEY, hi.slice(0,10));
+    placed = true;
+  }
+  if (lo.length < 10 || score < lo.at(-1).score){
+    lo.push({score, name:''});
+    lo.sort((a,b)=>a.score-b.score);
+    await saveRank(LO_KEY, lo.slice(0,10));
+    placed = true;
+  }
+  return placed;
+}
+
+async function saveNameToRanks(name){
+  const hi = await loadRank(HI_KEY);
+  const lo = await loadRank(LO_KEY);
+  [hi, lo].forEach(arr=>{
+    const i = arr.findIndex(r=>r.name==='');
+    if (i >= 0) arr[i].name = name;
+  });
+  await saveRank(HI_KEY, hi);
+  await saveRank(LO_KEY, lo);
+}
+
+async function renderRankModal(){
+    const hi = await loadRank(HI_KEY),
+    lo = await loadRank(LO_KEY);
+
+
+
+
+  let html = '<h3>番付</h3><div class="rank-table"><div><strong>お通じ番付</strong><ol>';
+  hi.forEach(r => html += `<li>${r.name || '??'}<span>${r.score}</span></li>`);
+  html += '</ol></div>';
+  html += '<div><strong>便秘番付</strong><ol>';
+  lo.forEach(r => html += `<li>${r.name || '??'}<span>${r.score}</span></li>`);
+  html += '</ol></div></div><button id="closeRank">とじる</button>';
+  document.getElementById('rankBox').innerHTML = html;
+  rankModal.classList.remove('hidden');
+  document.getElementById('closeRank').onclick = () => rankModal.classList.add('hidden');
+}
+
+/*-------- ゲーム本体（前バージョンから極力変更せず） --------*/
+const COLS = 8, ROWS = 14, CELL = 40;
+const CHARS = ["う", "ん", "ち"];
+const COLORS = { "う": "#668cff", "ん": "#ff9933", "ち": "#bb6655" };
+const DIRS = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+const BASE = 800, SOFT = 0.5;
+
+const cvs = document.getElementById('gameCanvas'),
+      ctx = cvs.getContext('2d');
+const scoreDIV = document.getElementById('score');
+const grid = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+
+class Piece {
+  constructor(big = false) {
+    this.big = big;
+    if (big) {
+      const sx = Math.floor(COLS / 2) - 1;
+      this.cells = [];
+      for (let dy = 0; dy < 3; dy++)
+        for (let dx = 0; dx < 3; dx++)
+          this.cells.push({ x: sx + dx, y: dy, char: rand() });
+    } else {
+      const m = Math.floor(COLS / 2);
+      this.cells = [
+        { x: m, y: 0, char: rand() },
+        { x: m, y: 1, char: rand() }
+      ];
+    }
+  }
+}
+
+let started = false, over = false, cur = null, nextBig = false, last = 0, soft = false, proc = false, score = 0;
+let enterReleased = true;   // ← ★ 追加 ★
+
+const rand = () => CHARS[Math.random() * 3 | 0],
+      inB = (x, y) => x >= 0 && x < COLS && y >= 0 && y < ROWS,
+      free = (x, y) => inB(x, y) && !grid[y][x],
+      upd = () => scoreDIV.textContent = `SCORE: ${score}`,
+      clear = () => grid.forEach(r => r.fill(null));
+
+function spawn() {
+  cur = new Piece(nextBig);
+  nextBig = false;
+  if (!cur.cells.every(c => free(c.x, c.y))) {
+    over = true;
+    proc = false;
+    onGameOver();                       // ← ここを追加
+     render();
+     return;
+  }
+}
+function rotPos(c, a) {
+  const ox = c.x - a.x, oy = c.y - a.y;
+  return { x: a.x - oy, y: a.y + ox };
+}
+function can(dx, dy, rot = false) {
+  return cur.cells.every((c, i) => {
+    let nx = c.x + dx, ny = c.y + dy;
+    if (rot && !cur.big && i === 1) {
+      const p = rotPos(c, cur.cells[0]);
+      nx = p.x + dx; ny = p.y + dy;
+    }
+    return free(nx, ny);
+  });
+}
+function mv(dx, dy) {
+  if (can(dx, dy))
+    cur.cells.forEach(c => { c.x += dx; c.y += dy; });
+}
+function rot() {
+  if (cur.big) return;
+  if (can(0, 0, true)) {
+    const b = cur.cells[1], np = rotPos(b, cur.cells[0]);
+    b.x = np.x; b.y = np.y;
+  }
+}
+function lock() {
+  cur.cells.forEach(c => {
+    if (!inB(c.x, c.y)) over = true;
+    else grid[c.y][c.x] = { char: c.char };
+  });
+  if (over) {
+    onGameOver();
+    render();
+    return;
+  }
+  chain(1, spawn);
+}
+function seq(word) {
+  const L = word.length, res = [];
+  for (let y = 0; y < ROWS; y++)
+    for (let x = 0; x < COLS; x++)
+      if (grid[y][x]?.char === word[0])
+        DIRS.forEach(([dx, dy]) => {
+          let ok = true, s = [];
+          for (let i = 0; i < L; i++) {
+            const nx = x + i * dx, ny = y + i * dy;
+            if (!inB(nx, ny) || grid[ny][nx]?.char !== word[i]) { ok = false; break; }
+            s.push({ x: nx, y: ny });
+          }
+          if (ok) res.push(s);
+        });
+  return res;
+}
+function fourSame() {
+  const list = [];
+  // horiz
+  for (let y = 0; y < ROWS; y++) {
+    let x = 0;
+    while (x < COLS) {
+      const ch = grid[y][x]?.char;
+      if (!ch) { x++; continue; }
+      let len = 1;
+      while (x + len < COLS && grid[y][x + len]?.char === ch) len++;
+      if (len >= 4) {
+        for (let s = 0; s + 4 <= len; s++)
+          list.push(Array.from({ length: 4 }, (_, i) => ({ x: x + s + i, y })));
+      }
+      x += len;
+    }
+  }
+  // vert
+  for (let x = 0; x < COLS; x++) {
+    let y = 0;
+    while (y < ROWS) {
+      const ch = grid[y][x]?.char;
+      if (!ch) { y++; continue; }
+      let len = 1;
+      while (y + len < ROWS && grid[y + len][x]?.char === ch) len++;
+      if (len >= 4) {
+        for (let s = 0; s + 4 <= len; s++)
+          list.push(Array.from({ length: 4 }, (_, i) => ({ x, y: y + s + i })));
+      }
+      y += len;
+    }
+  }
+  return list;
+}
+const uniq = a => {
+  const s = {};
+  return a.filter(p => {
+    const k = p.x + "," + p.y;
+    return s[k] ? false : (s[k] = 1, true);
+  });
+};
+const rem = b => b.forEach(({ x, y }) => grid[y][x] = null);
+
+function grav() {
+  for (let x = 0; x < COLS; x++)
+    for (let y = ROWS - 1; y >= 0; y--)
+      if (!grid[y][x]) {
+        let ny = y - 1;
+        while (ny >= 0 && !grid[ny][x]) ny--;
+        if (ny >= 0) {
+          grid[y][x] = grid[ny][x];
+          grid[ny][x] = null;
+        }
+      }
+}
+function flash(b, col, n, intv, done) {
+  b.forEach(p => {
+    const c = grid[p.y][p.x];
+    if (c) {
+      c.flashing = true;
+      c.flashColor = col;
+      c.flashOrig = COLORS[c.char];
+      c.flashState = true;
+    }
+  });
+  let cnt = 0, tog = () => {
+    b.forEach(p => grid[p.y][p.x] && (grid[p.y][p.x].flashState = !grid[p.y][p.x].flashState));
+    render();
+    if (++cnt < n * 2) setTimeout(tog, intv);
+    else {
+      b.forEach(p => grid[p.y][p.x] && delete grid[p.y][p.x].flashing);
+      render();
+      done();
+    }
+  };
+  render();
+  setTimeout(tog, intv);
+}
+function chain(step, cb) {
+  proc = true;
+  const chin = seq("ちんちん"),
+        unchi = seq("うんち"),
+        four = fourSame();
+  const all = [...chin, ...unchi, ...four];
+  if (all.length) {
+    const blk = uniq(all.flat());
+    let col = "#fff", fl = 2;
+    if (chin.length) { col = "#f00"; fl = 3; }
+    else if (four.length && !unchi.length) { col = "#aaa"; fl = 1; }
+    const base = unchi.length * 1 + chin.length * (-5);
+    score += base * (2 ** (step - 1));
+    upd();
+    if (chin.length) nextBig = true;
+    flash(blk, col, fl, 100, () => {
+      rem(blk);
+      grav();
+      render();
+      setTimeout(() => chain(step + 1, cb), 200);
+    });
+  } else {
+    proc = false;
+    cb && cb();
+  }
+}
+function draw(x, y, ch, c) {
+  const px = x * CELL, py = y * CELL;
+  const fill = c.flashing
+    ? (c.flashState ? c.flashColor : c.flashOrig)
+    : COLORS[ch];
+  ctx.fillStyle = fill;
+  ctx.fillRect(px + 2, py + 2, CELL - 4, CELL - 4);
+  ctx.fillStyle = "#000";
+  ctx.font = "28px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(ch, px + CELL / 2, py + CELL / 2 + 2);
+}
+function ov(lines) {
+  const w = 260, h = lines.length * 28 + 24,
+        rx = (cvs.width - w) / 2, ry = (cvs.height - h) / 2;
+  ctx.fillStyle = "#000c";
+  ctx.fillRect(rx, ry, w, h);
+  ctx.fillStyle = "#fff";
+  ctx.font = "22px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  lines.forEach((t, i) =>
+    ctx.fillText(t, cvs.width / 2, ry + (h / lines.length) * (i + 0.5))
+  );
+}
+function render() {
+  ctx.clearRect(0, 0, cvs.width, cvs.height);
+  for (let y = 0; y < ROWS; y++)
+    for (let x = 0; x < COLS; x++)
+      grid[y][x] && draw(x, y, grid[y][x].char, grid[y][x]);
+  if (started && !proc && !over && cur)
+    cur.cells.forEach(c => draw(c.x, c.y, c.char, {}));
+  if (!started) ov(["PRESS ENTER"]);
+  if (over) ov(["GAME OVER", "ENTER TO REPLAY"]);
+}
+const loop = t => {
+  const interval = soft ? BASE * SOFT : BASE;
+  if (started && !proc && !over && t - last > interval) {
+    if (can(0, 1)) mv(0, 1);
+    else lock();
+    last = t;
+  }
+  render();
+  requestAnimationFrame(loop);
+};
+/* input handling */
+document.addEventListener('keydown', e => {
+    if (isModalOpen()) return;
+    /* 押しっぱなし対策：まだ離していなければ無視 */
+    if (e.code === 'Enter' && !enterReleased) return;
+  if (e.code === 'ArrowDown') soft = true;
+  if (!started) {
+    if (e.code === 'Enter') {
+      started = true; over = false; score = 0; upd(); clear(); spawn(); last = performance.now();
+      enterReleased = false;   // このキー押下は消費済み
+      render();
+    }
+  } else if (over) {
+    if (e.code === 'Enter') {
+      started = true; over = false; score = 0; upd(); clear(); spawn(); last = performance.now();
+      enterReleased = false;
+      render();
+    }
+  } else if (!proc) {
+    switch (e.code) {
+      case 'ArrowLeft': mv(-1, 0); break;
+      case 'ArrowRight': mv(1, 0); break;
+      case 'ArrowDown': mv(0, 1); break;
+      case 'Space': rot(); break;
+    }
+    render();
+  }
+});
+document.addEventListener('keyup', e=>{
+  /* Enter を離した瞬間を必ず記録 */
+  if (e.code === 'Enter') enterReleased = true;
+
+  if (isModalOpen()) return;      // 以下はゲーム入力
+  if (e.code === 'ArrowDown') soft = false;
+});
+requestAnimationFrame(loop);
+
+/* HOW & RANK buttons */
+const howBtn = document.getElementById('howBtn'),
+      howModal = document.getElementById('howModal'),
+      closeHow = document.getElementById('closeHow');
+howBtn.onclick = () => howModal.classList.remove('hidden');
+closeHow.onclick = () => howModal.classList.add('hidden');
+howModal.addEventListener('click', e => e.target === howModal && howModal.classList.add('hidden'));
+
+const rankBtn = document.getElementById('rankBtn'),
+      rankModal = document.getElementById('rankModal');
+rankBtn.onclick = renderRankModal;
+rankModal.addEventListener('click', e => e.target === rankModal && rankModal.classList.add('hidden'));
+
+/* Name input flow */
+const nameModal = document.getElementById('nameModal'),
+      nameInput = document.getElementById('nameInput'),
+      saveName = document.getElementById('saveName');
+       /* ★ input 内で Enter → 名前保存（バブリングさせない） */
+ nameInput.addEventListener('keydown', e=>{
+   if (e.code === 'Enter'){
+     saveName.click();          // 保存ボタンを仮想クリック
+     e.preventDefault();        // フォーム送信などの既定動作を阻止
+   }
+   e.stopPropagation();         // ドキュメント側へ届かないように
+ });
+/* ★ 追加：ゲームオーバー時に呼ぶ共通関数 ------------ */
+ async function onGameOver(){
+   /* 10 位以内なら true が返る */
+   if (await tryRegister(score)){            // ← 待機
+     nameModal.classList.remove('hidden');
+   }
+ }
+saveName.onclick = async () => {
+  const name = nameInput.value.trim().slice(0, 6) || '??';
+  await saveNameToRanks(name);
+  nameInput.value = '';
+  nameModal.classList.add('hidden');
+  enterReleased = false;   // ← Enter リリース待ち
+};
+<script type="module">              <!-- ★ ES Modules 化 ★ -->
+
+/* ==== 1. Firebase SDK を読み込む（軽量なモジュール版） ==== */
+import { initializeApp } from
+  "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, query, orderBy, limit,
+         getDocs, addDoc, deleteDoc } from
+  "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+/* ==== 2. あなたの firebaseConfig を貼り付け ==== */
+const firebaseConfig = {
+  apiKey: "AIzaSyAcp9KxSJ-akG0CsEVFH3VZAKZcMg-fimg",
+  authDomain: "unchi-dy.firebaseapp.com",
+  projectId: "unchi-dy",
+  storageBucket: "unchi-dy.firebasestorage.app",
+  messagingSenderId: "994934229353",
+  appId: "1:994934229353:web:ba9a37faa9770d647255f8",
+  measurementId: "G-FV9TYC2WN4"
+};
+
+/* ==== 3. Firestore を初期化 ==== */
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
+
+/* ===== 既存コードを IIFE に包んで隔離（もとの形を維持） ===== */
+(()=>{
