@@ -13,10 +13,9 @@
   --grad2: #ff6699;
   --max-game-width: 360px;
   --cell-size: min(
-    calc((100vw - 16px) / 8),         /* 横方向 */
-    calc((100vh - 120px) / 14),       /* 縦方向（タイトル等120px分を除く） */
-    calc(var(--max-game-width) / 8)   /* 最大幅分 */
-    );
+    calc((100vw - 16px) / 8),
+    calc((100vh - 200px) / 14)
+  );
 }
 html,body{height:100%;margin:0;background:var(--bg);font-family:'Rounded Mplus 1c',sans-serif;color:#eee;display:flex;justify-content:center;align-items:flex-start;user-select:none}
 #wrapper {
@@ -231,16 +230,21 @@ const cvs = document.getElementById('gameCanvas'),
       ctx = cvs.getContext('2d');
       // ─── 画面幅に合わせて canvas をリサイズ ───
 function resizeCanvas() {
-  const vw = Math.min(window.innerWidth - 16, 360);
-  const vhAvailable = window.innerHeight - 120;    // タイトル・スコア・操作UI等の高さを除外
-  const cell = Math.min(vw / 8, vhAvailable / 14);
+  // ここで「縦に使える領域」をだいたい 200px 引く
+  // （タイトル90 + ボタン〜スコア〜説明で約100 + 下部コントロールで約50 など）
+  const availableWidth  = Math.min(window.innerWidth - 16, 360);
+  const availableHeight = window.innerHeight - 300;  
+
+  const cell = Math.min(availableWidth / 8, availableHeight / 14);
+
   const w = cell * 8, h = cell * 14;
+  const dpr = window.devicePixelRatio || 1;
+
   cvs.style.width  = `${w}px`;
   cvs.style.height = `${h}px`;
-  const dpr = window.devicePixelRatio || 1;
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
   cvs.width  = Math.floor(w * dpr);
   cvs.height = Math.floor(h * dpr);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.scale(dpr, dpr);
 }
 window.addEventListener('resize', () => {
