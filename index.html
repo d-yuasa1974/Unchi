@@ -47,9 +47,10 @@ html,body{height:100%;margin:0;background:var(--bg);font-family:'Rounded Mplus 1
     border: none;
     user-select: none;
   }
-  @media (min-width: 769px) {
-    #touchControls { display: none; }
-  }
+  @media (pointer: fine) {
+  /* マウス主体デバイスでは非表示 */
+  #touchControls { display: none; }
+}
 </style>
 </head>
 <body>
@@ -65,11 +66,13 @@ html,body{height:100%;margin:0;background:var(--bg);font-family:'Rounded Mplus 1
 </div>
 <!-- ここから追加：スマホ用タッチコントロール -->
   <div id="touchControls">
+  <div id="dpad">
     <button id="btnLeft">◀</button>
-    <button id="btnRight">▶</button>
     <button id="btnDown">▼</button>
-    <button id="btnRotate">⟳</button>
+    <button id="btnRight">▶</button>
   </div>
+  <button id="btnRotate">⟳</button>
+</div>
 <div id="howModal" class="modal hidden"><div class="modal-box"><h3>遊びかた</h3><p>「うんち」をつなげて<strong>ドカン！</strong>と出そう！</p><p>縦・横にそろうとお通じが発生するよ。</p><p>同じ4文字をそろえても消えるけど点数はつきません。</p><p>連鎖でお通じが発生すると得点アップ！</p><p>お下品な言葉がそろうと…お仕置きがあるかも？</p><button id="closeHow">とじる</button></div></div>
 
 <div id="rankModal" class="modal hidden"><div class="modal-box" id="rankBox"></div></div>
@@ -459,7 +462,9 @@ document.addEventListener('keyup', e=>{
   if (e.code === 'ArrowDown') soft = false;
 });
 
-// ─── ここから追加：スマホタッチ操作のバインド ───
+if ('ontouchstart' in window) {
+  // タッチ対応デバイスのみで以下を実行
+
   function bindTouch(id, fn, opts = {}) {
     const btn = document.getElementById(id);
     let timer = null;
@@ -480,19 +485,16 @@ document.addEventListener('keyup', e=>{
   bindTouch('btnDown',   () => { soft = true; mv(0,1); }, { repeat: true, interval: 100, endFn: () => { soft = false; } });
   bindTouch('btnRotate', () => rot());
 
+  // 「PRESS ENTER」画面やGAME OVER画面のタップ開始もタッチのみ
   cvs.addEventListener('touchstart', e => {
     if (isModalOpen()) return;
     if (!started || over) {
-      started = true;
-      over    = false;
-      score   = 0;
-      upd();
-      clear();
-      spawn();
-      last = performance.now();
+      started = true; over = false; score = 0;
+      upd(); clear(); spawn(); last = performance.now();
       render();
     }
   }, { passive: false });
+}
 requestAnimationFrame(loop);
 
 /* HOW & RANK buttons */
