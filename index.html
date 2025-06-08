@@ -193,15 +193,22 @@ async function tryRegister(score){
   return placed;
 }
 
-async function saveNameToRanks(name){
+async function saveNameToRanks(name, score) {
+  // お通じ番付（HI_KEY）
   const hi = await loadRank(HI_KEY);
+  const hiIdx = hi.findIndex(r => r.name === '' && r.score === score);
+  if (hiIdx >= 0) {
+    hi[hiIdx].name = name;
+    await saveRank(HI_KEY, hi);
+  }
+
+  // 便秘番付（LO_KEY）
   const lo = await loadRank(LO_KEY);
-  [hi, lo].forEach(arr=>{
-    const i = arr.findIndex(r=>r.name==='');
-    if (i >= 0) arr[i].name = name;
-  });
-  await saveRank(HI_KEY, hi);
-  await saveRank(LO_KEY, lo);
+  const loIdx = lo.findIndex(r => r.name === '' && r.score === score);
+  if (loIdx >= 0) {
+    lo[loIdx].name = name;
+    await saveRank(LO_KEY, lo);
+  }
 }
 
 
@@ -226,6 +233,8 @@ const CHARS = ["う", "ん", "ち"];
 const COLORS = { "う": "#668cff", "ん": "#ff9933", "ち": "#bb6655" };
 const DIRS = [[0, 1], [0, -1], [1, 0], [-1, 0]];
 const BASE = 800, SOFT = 0.5;
+let spawnCount = 0;
+let lastScore = null;
 
 const cvs = document.getElementById('gameCanvas'),
       ctx = cvs.getContext('2d');
@@ -286,6 +295,7 @@ const rand = () => CHARS[Math.random() * 3 | 0],
       clear = () => grid.forEach(r => r.fill(null));
 
 async function spawn() {
+    spawnCount++;
   cur = new Piece(nextBig);
   nextBig = false;
   if (!cur.cells.every(c => free(c.x, c.y))) {
@@ -498,7 +508,12 @@ function render() {
   if (over) ov(["GAME OVER", "ENTER TO REPLAY"]);
 }
 const loop = t => {
-  const interval = soft ? BASE * SOFT : BASE;
+  // 基本落下間隔を取得
+  const baseInterval = soft ? BASE * SOFT : BASE;
+  // 20回ごとに 0.9 倍、かつ下限を 200ms に固定
+  const levels     = Math.floor(spawnCount / 20);
+  const multiplier = Math.pow(0.9, levels);
+  const interval   = Math.max(baseInterval * multiplier, 200);
   if (started && !proc && !over && t - last > interval) {
     if (can(0, 1)) mv(0, 1);
     else lock();
@@ -606,14 +621,15 @@ const nameModal = document.getElementById('nameModal'),
 /* ★ 追加：ゲームオーバー時に呼ぶ共通関数 ------------ */
  async function onGameOver(){
      if (await tryRegister(score)){            // ← 待機
+         lastScore = score;
          nameModal.classList.remove('hidden');
    }
  }
 saveName.onclick = async () => {
   const name = nameInput.value.trim().slice(0, 6) || '??';
-  await saveNameToRanks(name);
+  await saveNameToRanks(name, lastScore);  // ← 引数に lastScore を追加
   nameInput.value = '';
   nameModal.classList.add('hidden');
-  enterReleased = false;   // ← Enter リリース待ち
+  enterReleased = false;
 };
 </script>
