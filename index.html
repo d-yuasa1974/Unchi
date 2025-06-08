@@ -1,10 +1,19 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">  
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>おつうじドカン！</title>
 <style>
-:root{--bg:#111;--panel:#222;--score-color:#ffe761;--grad1:#ff99cc;--grad2:#ff6699}
+:root {
+  --bg: #111;
+  --panel: #222;
+  --score-color: #ffe761;
+  --grad1: #ff99cc;
+  --grad2: #ff6699;
+  --max-game-width: 360px;
+  --cell-size: min(calc((100vw - 16px) / 8), calc(var(--max-game-width) / 8));
+}
 html,body{height:100%;margin:0;background:var(--bg);font-family:'Rounded Mplus 1c',sans-serif;color:#eee;display:flex;justify-content:center;align-items:flex-start;user-select:none}
 #wrapper {
   position: relative;      /* コントローラ配置の基準に */
@@ -12,15 +21,26 @@ html,body{height:100%;margin:0;background:var(--bg);font-family:'Rounded Mplus 1
   margin-top: 8px;
 }
 #titleSVG{width:360px;height:90px}
-.btn{border:none;border-radius:20px;padding:6px 20px;font-size:1rem;font-weight:700;color:#fff;cursor:pointer;box-shadow:0 0 8px #000a;transition:transform .1s}
+.btn {
+  border: none;
+  border-radius: 20px;
+  padding: clamp(8px, 2vw, 12px) clamp(16px, 4vw, 24px);
+  font-size: clamp(1rem, 3vw, 1.4rem);
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 0 8px #000a;
+  transition: transform .1s;
+}
 .btn:active{transform:scale(.96)}
 .how-btn{background:linear-gradient(90deg,var(--grad1),var(--grad2))}
 .rank-btn{background:#66c;}
 #score{font-size:1.6rem;font-weight:800;color:var(--score-color);text-shadow:0 0 6px var(--score-color)}
 #gameCanvas {
-  width: 100%;
-  max-width: 100%;
-  height: auto;            /* アスペクト比を保持 */
+  width: calc(var(--cell-size) * 8);
+  height: calc(var(--cell-size) * 14);
+  display: block;
+  margin: 0 auto;
 }
 #info{margin-top:4px;font-size:.9rem;color:#ccc}
 .modal{position:fixed;inset:0;background:#000c;display:flex;justify-content:center;align-items:center;font-size:.9rem;z-index:1000}
@@ -85,7 +105,7 @@ html,body{height:100%;margin:0;background:var(--bg);font-family:'Rounded Mplus 1
     <button id="rankBtn"  class="btn rank-btn">ランキング</button>
   </div>
   <div id="score">SCORE: 0</div>
-  <canvas id="gameCanvas" width="320" height="560"></canvas>
+  <canvas id="gameCanvas"></canvas>
   <div id="info">Enter:開始 / ←→:横移動 / ↓:高速落下 / Space:回転</div>
 </div>
 <!-- ここから追加：スマホ用タッチコントロール -->
@@ -205,6 +225,24 @@ const BASE = 800, SOFT = 0.5;
 
 const cvs = document.getElementById('gameCanvas'),
       ctx = cvs.getContext('2d');
+      // ─── 画面幅に合わせて canvas をリサイズ ───
+function resizeCanvas() {
+  const vw = Math.min(window.innerWidth - 16, 360);
+  const cell = vw / 8;
+  const w = cell * 8, h = cell * 14;
+  cvs.style.width  = `${w}px`;
+  cvs.style.height = `${h}px`;
+  const dpr = window.devicePixelRatio || 1;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  cvs.width  = Math.floor(w * dpr);
+  cvs.height = Math.floor(h * dpr);
+  ctx.scale(dpr, dpr);
+}
+window.addEventListener('resize', () => {
+  resizeCanvas();
+  render();
+});
+resizeCanvas();
 const scoreDIV = document.getElementById('score');
 const grid = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
 
