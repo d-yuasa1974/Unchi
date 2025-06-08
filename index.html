@@ -6,14 +6,22 @@
 <style>
 :root{--bg:#111;--panel:#222;--score-color:#ffe761;--grad1:#ff99cc;--grad2:#ff6699}
 html,body{height:100%;margin:0;background:var(--bg);font-family:'Rounded Mplus 1c',sans-serif;color:#eee;display:flex;justify-content:center;align-items:flex-start;user-select:none}
-#wrapper{display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:8px}
+#wrapper {
+  position: relative;      /* コントローラ配置の基準に */
+  width: 100%;             
+  max-width: 360px;        /* 元のキャンバス幅に合わせる */
+  margin-top: 8px;
+}
 #titleSVG{width:360px;height:90px}
 .btn{border:none;border-radius:20px;padding:6px 20px;font-size:1rem;font-weight:700;color:#fff;cursor:pointer;box-shadow:0 0 8px #000a;transition:transform .1s}
 .btn:active{transform:scale(.96)}
 .how-btn{background:linear-gradient(90deg,var(--grad1),var(--grad2))}
 .rank-btn{background:#66c;}
 #score{font-size:1.6rem;font-weight:800;color:var(--score-color);text-shadow:0 0 6px var(--score-color)}
-#gameCanvas{background:var(--panel);box-shadow:0 0 12px #000a;border-radius:4px}
+#gameCanvas {
+  width: 100%;
+  height: auto;            /* アスペクト比を保持 */
+}
 #info{margin-top:4px;font-size:.9rem;color:#ccc}
 .modal{position:fixed;inset:0;background:#000c;display:flex;justify-content:center;align-items:center;font-size:.9rem;z-index:1000}
 .hidden{display:none}
@@ -27,26 +35,42 @@ html,body{height:100%;margin:0;background:var(--bg);font-family:'Rounded Mplus 1
 .rank-table span{float:right}
 /* ─── ここから追加 ─── */
   #touchControls {
-    position: absolute;
-    bottom: 16px;
-    left: 0;
-    width: 100%;
-    display: flex;
-    justify-content: space-around;
-    pointer-events: none;
-    z-index: 500;
-  }
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: calc(100% - 16px);
+  pointer-events: none;
+  z-index: 500;
+}
   #touchControls button {
-    pointer-events: auto;
-    width: 60px;
-    height: 60px;
-    border-radius: 30px;
-    background: rgba(255,255,255,0.2);
+  /* ③ ボタンサイズを画面幅に応じて調整 */
+  width: clamp(50px, 12vw, 70px);
+  height: clamp(50px, 12vw, 70px);
+  font-size: clamp(1rem, 4vw, 1.5rem);
+  border-radius: 50%;
+  background: rgba(255,255,255,0.2);
     color: #fff;
     font-size: 1.5rem;
     border: none;
     user-select: none;
   }
+  /* ④ 十字キーを縦並び＆間隔調整 */
+#touchControls #dpad {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+/* 回転ボタンだけ右に余白 */
+#touchControls > button {
+  pointer-events: auto;
+  margin-left: 16px;
+}
   @media (pointer: fine) {
   /* マウス主体デバイスでは非表示 */
   #touchControls { display: none; }
