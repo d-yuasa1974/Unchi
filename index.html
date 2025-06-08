@@ -220,7 +220,8 @@ async function renderRankModal(){
 }
 
 /*-------- ゲーム本体（前バージョンから極力変更せず） --------*/
-const COLS = 8, ROWS = 14, CELL = 40;
+const COLS = 8, ROWS = 14;
+let CELL = 40;
 const CHARS = ["う", "ん", "ち"];
 const COLORS = { "う": "#668cff", "ん": "#ff9933", "ち": "#bb6655" };
 const DIRS = [[0, 1], [0, -1], [1, 0], [-1, 0]];
@@ -235,7 +236,8 @@ function resizeCanvas() {
   const availableWidth  = Math.min(window.innerWidth - 16, 360);
   const availableHeight = window.innerHeight - 300;  
 
-  const cell = Math.min(availableWidth / 8, availableHeight / 14);
+  const cell = Math.min(availableWidth / COLS, availableHeight / ROWS);
+  CELL = cell;
 
   const w = cell * 8, h = cell * 14;
   const dpr = window.devicePixelRatio || 1;
@@ -465,8 +467,13 @@ function draw(x, y, ch, c) {
   ctx.fillText(ch, px + CELL / 2, py + CELL / 2 + 2);
 }
 function ov(lines) {
-  const w = 260, h = lines.length * 28 + 24,
-        rx = (cvs.width - w) / 2, ry = (cvs.height - h) / 2;
+  const w = 260;
+  const h = lines.length * 28 + 24;
+  const cssW = cvs.clientWidth;
+  const cssH = cvs.clientHeight;
+  const rx = (cssW - w) / 2;
+  const ry = (cssH - h) / 2;
+
   ctx.fillStyle = "#000c";
   ctx.fillRect(rx, ry, w, h);
   ctx.fillStyle = "#fff";
@@ -474,7 +481,10 @@ function ov(lines) {
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   lines.forEach((t, i) =>
-    ctx.fillText(t, cvs.width / 2, ry + (h / lines.length) * (i + 0.5))
+    ctx.fillText(
+      t,cssW / 2,
+      ry + (h / lines.length) * (i + 0.5)
+    )
   );
 }
 function render() {
