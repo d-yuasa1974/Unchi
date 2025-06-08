@@ -12,7 +12,10 @@
   --grad1: #ff99cc;
   --grad2: #ff6699;
   --max-game-width: 360px;
-  --cell-size: min(calc((100vw - 16px) / 8), calc(var(--max-game-width) / 8));
+  --cell-size: min(
+    calc((100vw - 16px) / 8),         /* 横方向 */
+    calc((100vh - 120px) / 14),       /* 縦方向（タイトル等120px分を除く） */
+    calc(var(--max-game-width) / 8)   /* 最大幅分 */
 }
 html,body{height:100%;margin:0;background:var(--bg);font-family:'Rounded Mplus 1c',sans-serif;color:#eee;display:flex;justify-content:center;align-items:flex-start;user-select:none}
 #wrapper {
@@ -228,7 +231,8 @@ const cvs = document.getElementById('gameCanvas'),
       // ─── 画面幅に合わせて canvas をリサイズ ───
 function resizeCanvas() {
   const vw = Math.min(window.innerWidth - 16, 360);
-  const cell = vw / 8;
+  const vhAvailable = window.innerHeight - 120;    // タイトル・スコア・操作UI等の高さを除外
+  const cell = Math.min(vw / 8, vhAvailable / 14);
   const w = cell * 8, h = cell * 14;
   cvs.style.width  = `${w}px`;
   cvs.style.height = `${h}px`;
