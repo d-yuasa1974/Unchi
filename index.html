@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>おつうじドカン！</title>
 <style>
 :root {
@@ -18,6 +18,9 @@
   );
 }
 html,body{height:100%;margin:0;background:var(--bg);font-family:'Rounded Mplus 1c',sans-serif;color:#eee;display:flex;justify-content:center;align-items:flex-start;user-select:none}
+body, #wrapper {
+  touch-action: none;
+}
 #wrapper {
   position: relative;      /* コントローラ配置の基準に */
   width: 100%;
@@ -80,6 +83,7 @@ html,body{height:100%;margin:0;background:var(--bg);font-family:'Rounded Mplus 1
     font-size: 1.5rem;
     border: none;
     user-select: none;
+    touch-action: manipulation;
   }
   /* ④ 十字キーを縦並び＆間隔調整 */
 #touchControls #dpad {
@@ -262,6 +266,12 @@ function resizeCanvas() {
   cvs.height = Math.floor(h * dpr);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.scale(dpr, dpr);
+
+  // 追加: タッチコントロールの幅をcanvasに合わせる
+  const tc = document.getElementById('touchControls');
+  if (tc) {
+    tc.style.width = `${cvs.clientWidth}px`;
+  }
 }
 window.addEventListener('resize', () => {
   resizeCanvas();
@@ -570,19 +580,51 @@ if ('ontouchstart' in window) {
   // タッチ対応デバイスのみで以下を実行
 
   function bindTouch(id, fn, opts = {}) {
-    const btn = document.getElementById(id);
-    let timer = null;
-    const interval = opts.interval || 150;
-    btn.addEventListener('touchstart', e => {
-      e.preventDefault();
-      fn();
-      if (opts.repeat) timer = setInterval(fn, interval);
-    }, { passive: false });
-    btn.addEventListener('touchend', () => {
-      clearInterval(timer);
-      if (opts.endFn) opts.endFn();
-    });
-  }
+  const btn = document.getElementById(id);
+  let timer = null;
+  const interval = opts.interval || 150;
+
+  // 状態管理用
+  let active = false;
+
+  const clear = () => {
+    if (timer) clearInterval(timer);
+    timer = null;
+    active = false;
+    if (opts.endFn) opts.endFn();
+  };
+
+  btn.addEventListener('touchstart', e => {
+    e.preventDefault();
+    if (active) return;
+    active = true;
+    fn();
+    if (opts.repeat) timer = setInterval(fn, interval);
+
+    // windowにtouchend/touchcancelをバインド
+    window.addEventListener('touchend', clear, { once: true });
+    window.addEventListener('touchcancel', clear, { once: true });
+  }, { passive: false });
+
+  // ボタン上で指が離れた場合
+  btn.addEventListener('touchend', clear);
+  btn.addEventListener('touchcancel', clear);
+
+  // 指がボタン外に出た場合も解除
+  btn.addEventListener('touchmove', e => {
+    const touch = e.touches[0];
+    if (!touch) { clear(); return; }
+    const rect = btn.getBoundingClientRect();
+    if (
+      touch.clientX < rect.left ||
+      touch.clientX > rect.right ||
+      touch.clientY < rect.top ||
+      touch.clientY > rect.bottom
+    ) {
+      clear();
+    }
+  });
+}
 
   bindTouch('btnLeft',   () => mv(-1, 0),   { repeat: true, interval: 150 });
   bindTouch('btnRight',  () => mv( 1, 0),   { repeat: true, interval: 150 });
@@ -596,6 +638,7 @@ if ('ontouchstart' in window) {
       started = true; over = false; score = 0;
       upd(); clear(); spawn(); last = performance.now();
       render();
+      logGameStart(); // ← 追加
     }
   }, { passive: false });
 }
@@ -626,12 +669,16 @@ const nameModal = document.getElementById('nameModal'),
    }
    e.stopPropagation();         // ドキュメント側へ届かないように
  });
+nameInput.addEventListener('focus', () => {
+  setTimeout(() => nameInput.scrollIntoView({ block: 'center', behavior: 'smooth' }), 200);
+});
 /* ★ 追加：ゲームオーバー時に呼ぶ共通関数 ------------ */
  async function onGameOver(){
-     if (await tryRegister(score)){            // ← 待機
-         lastScore = score;
-         nameModal.classList.remove('hidden');
-   }
+  if (await tryRegister(score)){
+    lastScore = score;
+    nameModal.classList.remove('hidden');
+    setTimeout(() => nameInput.focus(), 100); // モーダル表示後にフォーカス
+  }
  }
 saveName.onclick = async () => {
   const name = nameInput.value.trim().slice(0, 6) || '??';
@@ -640,4 +687,18 @@ saveName.onclick = async () => {
   nameModal.classList.add('hidden');
   enterReleased = false;
 };
+nameModal.addEventListener('click', e => {
+  // 何もしない（外側タップで閉じない）
+});
+
+function hideAddressBar() {
+  setTimeout(() => window.scrollTo(0, 1), 100);
+}
+// ゲーム開始時
+if ('ontouchstart' in window) {
+  cvs.addEventListener('touchstart', e => {
+    // ...existing code...
+    hideAddressBar();
+  }, { passive: false });
+}
 </script>
