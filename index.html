@@ -131,6 +131,7 @@ html,body{height:100%;margin:0;background:var(--bg);font-family:'Rounded Mplus 1
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, query, orderBy, limit, getDocs, addDoc, deleteDoc }
    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js";
 
 /* ==== 2. あなたの firebaseConfig を貼り付け ==== */
 const firebaseConfig = {
@@ -146,6 +147,10 @@ const firebaseConfig = {
 /* ==== 3. Firestore を初期化 ==== */
 const app = initializeApp(firebaseConfig);
 const db  = getFirestore(app);
+const analytics = getAnalytics(app);
+function logGameStart() {
+  logEvent(analytics, 'game_start');
+}
 
  /*================== 共通ヘルパ ==================*/
 /* モーダルが 1 枚でも開いているか判定 */
@@ -534,12 +539,14 @@ document.addEventListener('keydown', e => {
       started = true; over = false; score = 0; upd(); clear(); spawn(); last = performance.now();
       enterReleased = false;   // このキー押下は消費済み
       render();
+      logGameStart();
     }
   } else if (over) {
     if (e.code === 'Enter') {
       started = true; over = false; score = 0; upd(); clear(); spawn(); last = performance.now();
       enterReleased = false;
       render();
+      logGameStart();
     }
   } else if (!proc) {
     switch (e.code) {
